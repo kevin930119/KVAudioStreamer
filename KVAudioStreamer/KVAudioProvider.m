@@ -92,9 +92,11 @@
             [self.delegate audioProviderReceiveData:data];
         }
     }else {
-        if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorType:msg:error:)]) {
-            [self.delegate audioProviderDidFailWithErrorType:KVAudioStreamerErrorTypeLocalFile msg:@"获取不到本地文件数据" error:nil];
-        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorType:msg:error:)]) {
+                [self.delegate audioProviderDidFailWithErrorType:KVAudioStreamerErrorTypeLocalFile msg:@"获取不到本地文件数据" error:nil];
+            }
+        });
         response = KVAudioProviderReponseFail;
     }
     return response;
@@ -165,7 +167,7 @@
         self.netData = [NSMutableData dataWithData:data];
     }
     if (self.waitingForNetData) {
-        if ((self.netData.length + self.netDataRequestStart) > self.currentFileLocation && ((self.netData.length + self.netDataRequestStart) - self.currentFileLocation > kAudioFileBufferSize)) {
+        if (((self.netData.length + self.netDataRequestStart) - self.currentFileLocation > kAudioFileBufferSize) || self.netDataReceiveComplete) {
             self.waitingForNetData = NO;
             NSData * data = [self.netData subdataWithRange:NSMakeRange(self.currentFileLocation - self.netDataRequestStart, self.netData.length - (self.currentFileLocation - self.netDataRequestStart))];
             self.currentFileLocation += data.length;
@@ -202,9 +204,11 @@
 - (void)didCompleteWithHttpError:(NSError *)error {
     if (error) {
         if (error.code != -999 && ![error.localizedDescription isEqualToString:@"cancelled"]) {
-            if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorType:msg:error:)]) {
-                [self.delegate audioProviderDidFailWithErrorType:KVAudioStreamerErrorTypeNetwork msg:@"网络请求错误" error:error];
-            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorType:msg:error:)]) {
+                    [self.delegate audioProviderDidFailWithErrorType:KVAudioStreamerErrorTypeNetwork msg:@"网络请求错误" error:error];
+                }
+            });
         }
     }else {
         if (self.netData.length && self.netDataRequestStart == 0) {

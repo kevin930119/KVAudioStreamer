@@ -21,6 +21,7 @@
 @property (nonatomic, strong) UISlider * volumeSlider;
 @property (nonatomic, strong) NSTimer * playTimeObserveTimer;   //监听播放时长的定时器
 @property (nonatomic, assign) long currentSeekTime; //当前seek的位置，为了准确计算播放时长
+@property (atomic, assign) BOOL forPrepare;
 
 @end
 
@@ -90,12 +91,12 @@
         //缓冲中和播放中无效
         return;
     }
-    
     if (self.status == KVAudioStreamerPlayStatusPause) {
         //是暂停状态
         [self.currentAudioConsumer play];
     }else {
         self.currentSeekTime = 0;
+        self.forPrepare = NO;
         self.currentAudioConsumer.isFinish = NO;
         [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
         //开始获取数据
@@ -114,7 +115,21 @@
         return;
     }
     
-    
+    if (self.status == KVAudioStreamerPlayStatusPause) {
+        //是暂停状态
+        [self.currentAudioConsumer play];
+    }else {
+        if (location <= 0) {
+            [self play];
+            return;
+        }
+        self.currentSeekTime = location;
+        self.currentAudioConsumer.isFinish = NO;
+        [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+        //开始获取数据，这里从头获取数据是为了提前知道音频格式，方便计算seek的位置
+        self.forPrepare = YES;
+        [self.currentAudioProvider getDataWithOffset:0 length:kAudioFileBufferSize];
+    }
 }
 
 /**
@@ -149,6 +164,7 @@
         //如果不是缓冲中或播放中无效
         return;
     }
+    self.forPrepare = NO;
     [self.currentAudioConsumer pause];
 }
 
@@ -160,6 +176,7 @@
         return;
     }
     //停止网络请求数据
+    self.forPrepare = NO;
     self.currentSeekTime = 0;
     [self.currentAudioProvider resetDataRequest];
     [self.currentAudioConsumer resetAudioQueue];
@@ -185,14 +202,20 @@
 #pragma mark - 生产者代理事件
 - (void)audioProviderReceiveData:(NSData *)data {
     __weak __typeof(&*self)weakSelf = self;
-    dispatch_async(_audioDataParseQueue, ^{
-        BOOL flag = weakSelf.isDiscontinuity;
-        if (weakSelf.isDiscontinuity) {
-            weakSelf.currentAudioConsumer.isFinish = NO;
-            weakSelf.isDiscontinuity = NO;
-        }
-        [weakSelf.currentAudioConsumer fillAudioData:data isDiscontinuity:flag];
-    });
+    if (self.forPrepare) {
+        dispatch_async(_audioDataParseQueue, ^{
+            [weakSelf.currentAudioConsumer prepareWithData:data];
+        });
+    }else {
+        dispatch_async(_audioDataParseQueue, ^{
+            BOOL flag = weakSelf.isDiscontinuity;
+            if (weakSelf.isDiscontinuity) {
+                weakSelf.currentAudioConsumer.isFinish = NO;
+                weakSelf.isDiscontinuity = NO;
+            }
+            [weakSelf.currentAudioConsumer fillAudioData:data isDiscontinuity:flag];
+        });
+    }
 }
 
 - (BOOL)audioProviderFileCacheFinishWithDir:(NSString *)dir filename:(NSString *)filename cachepath:(NSString *)cachepath {
@@ -205,12 +228,22 @@
 }
 
 - (void)audioProviderDidFailWithErrorType:(KVAudioStreamerErrorType)errorType msg:(NSString *)msg error:(NSError *)error {
-    NSLog(@"%@", msg);
+    if ([self.delegate respondsToSelector:@selector(audioStreamer:didFailWithErrorType:msg:error:)]) {
+        [self.delegate audioStreamer:self didFailWithErrorType:errorType msg:msg error:error];
+    }
 }
 
 #pragma mark - 消费者代理事件
 - (KVAudioProviderReponse)wantAudioData {
     return [self.currentAudioProvider getDataWithOffset:self.currentAudioProvider.currentFileLocation length:kAudioFileBufferSize];
+}
+
+- (void)prepareAlready {
+    if (self.forPrepare && self.currentSeekTime) {
+        //是需要准备的
+        self.forPrepare = NO;
+        [self seekToTime:self.currentSeekTime];
+    }
 }
 
 - (void)beginPlay {
@@ -231,6 +264,19 @@
 - (void)playFinish {
     [self performSelectorOnMainThread:@selector(releaseTimer) withObject:nil waitUntilDone:YES];
     [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusFinish];
+}
+
+- (void)playDone {
+    [self performSelectorOnMainThread:@selector(releaseTimer) withObject:nil waitUntilDone:YES];
+    [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+}
+
+- (void)audioProviderDidFailWithErrorMsg:(NSString *)msg {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if ([self.delegate respondsToSelector:@selector(audioStreamer:didFailWithErrorType:msg:error:)]) {
+            [self.delegate audioStreamer:self didFailWithErrorType:KVAudioStreamerErrorTypeDecode msg:msg error:nil];
+        }
+    });
 }
 
 #pragma mark - 数据解析
@@ -331,20 +377,6 @@
         self.status = status;
         if ([self.delegate respondsToSelector:@selector(audioStreamer: playStatusChange:)]) {
             [self.delegate audioStreamer:self playStatusChange:self.status];
-        }
-    });
-}
-
-/**
- 通知错误发生
-
- @param type 错误类型
- @param msg 错误描述
- */
-- (void)notifyDelegateForError:(KVAudioStreamerErrorType)type msg:(NSString*)msg {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if ([self.delegate respondsToSelector:@selector(audioStreamer:didFailWithErrorType:msg:)]) {
-            [self.delegate audioStreamer:self didFailWithErrorType:type msg:msg];
         }
     });
 }

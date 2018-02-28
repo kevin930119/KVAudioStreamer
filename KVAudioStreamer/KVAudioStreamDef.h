@@ -15,8 +15,7 @@ typedef NS_ENUM(NSInteger, KVAudioStreamerPlayStatus) {
     KVAudioStreamerPlayStatusPlaying,   //播放
     KVAudioStreamerPlayStatusPause, //暂停
     KVAudioStreamerPlayStatusFinish,  //完成播放
-    KVAudioStreamerPlayStatusStop,  //停止
-    KVAudioStreamerPlayStatusError //有错误发生
+    KVAudioStreamerPlayStatusStop  //停止
 };
 
 typedef NS_ENUM(NSInteger, KVAudioStreamerErrorType) {
@@ -32,7 +31,7 @@ typedef NS_ENUM(NSInteger, KVAudioProviderReponse) {
     KVAudioProviderReponseWaiting   //等待数据
 };
 
-#define kNumberOfBuffers 3              //AudioQueueBuffer数量，一般指明为3
+#define kNumberOfBuffers 3              //AudioQueueBuffer数量
 #define kAQBufSize 10240           //每个AudioQueueBuffer的大小
 #define kAudioFileBufferSize 61440       //文件读取数据的缓冲区大小
 #define kMaxPacketDesc 512              //最大的AudioStreamPacketDescription个数

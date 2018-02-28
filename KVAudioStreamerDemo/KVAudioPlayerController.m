@@ -163,7 +163,8 @@
         AVAudioSession *session = [AVAudioSession sharedInstance];
         [session setCategory:AVAudioSessionCategoryPlayback error:nil];
         [session setActive:YES error:nil];
-        [self.streamer play];
+//        [self.streamer play];
+        [self.streamer playAtTime:100];
     }
 }
 
@@ -207,12 +208,6 @@
             self.playBtn.selected = NO;
         }
             break;
-        case KVAudioStreamerPlayStatusError:
-            NSLog(@"播放出错");
-        {
-            self.playBtn.selected = NO;
-        }
-            break;
         default:
             break;
     }
@@ -234,7 +229,7 @@
     return YES;
 }
 
-- (void)audioStreamer:(KVAudioStreamer *)streamer didFailWithErrorType:(KVAudioStreamerErrorType)errorType msg:(NSString *)msg {
+- (void)audioStreamer:(KVAudioStreamer *)streamer didFailWithErrorType:(KVAudioStreamerErrorType)errorType msg:(NSString *)msg error:(NSError *)error {
     NSLog(@"%@", msg);
 }
 

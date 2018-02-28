@@ -13,6 +13,8 @@
 
 - (KVAudioProviderReponse)wantAudioData;
 
+- (void)prepareAlready;
+
 - (void)beginPlay;
 
 - (void)playPause;
@@ -20,6 +22,13 @@
 - (void)playStop;
 
 - (void)playFinish;
+
+/**
+ 播放完成，没有等待播放的缓存区，而且也没有结束数据解析
+ */
+- (void)playDone;
+
+- (void)audioProviderDidFailWithErrorMsg:(NSString*)msg;
 
 @end
 
@@ -31,10 +40,12 @@
 @property (atomic, assign) BOOL isPrepare;  //音频是否准备完成
 @property (nonatomic, assign) BOOL isPause; //音频是否处于暂停状态
 @property (nonatomic, assign) float playRate;   //播放速率
+@property (atomic, assign) BOOL forPrepare;
 
 + (instancetype)initWithAudioFile:(KVAudioFile*)file delegate:(id<KVAudioConsumerDelegate>)delegate;
 
 #pragma mark - 音频控制
+- (void)prepareWithData:(NSData*)data;    //这里主要是提前获取音频格式
 - (void)play;
 - (void)pause;
 - (void)stop;

@@ -19,7 +19,6 @@
 		0AE45B832046470F00DB7189 /* NSString+KVURL.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B792046470F00DB7189 /* NSString+KVURL.m */; };
 		0AE45B842046470F00DB7189 /* KVAudioStreamer.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B7B2046470F00DB7189 /* KVAudioStreamer.m */; };
 		0AE45B852046470F00DB7189 /* KVAudioFile.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B7C2046470F00DB7189 /* KVAudioFile.m */; };
-		0AE45B862046470F00DB7189 /* KVAudioStreamerPlayList.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B7D2046470F00DB7189 /* KVAudioStreamerPlayList.m */; };
 		0AE45B872046470F00DB7189 /* KVAudioStreamHttpTool.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B7F2046470F00DB7189 /* KVAudioStreamHttpTool.m */; };
 		0AE45B882046470F00DB7189 /* KVAudioProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B802046470F00DB7189 /* KVAudioProvider.m */; };
 		0AE45B8B204647B000DB7189 /* KVAudioPlayerController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B8A204647B000DB7189 /* KVAudioPlayerController.m */; };
@@ -76,14 +75,12 @@
 		0AE45B732046470F00DB7189 /* KVAudioStreamer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioStreamer.h; sourceTree = "<group>"; };
 		0AE45B742046470F00DB7189 /* KVAudioConsumer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KVAudioConsumer.m; sourceTree = "<group>"; };
 		0AE45B752046470F00DB7189 /* KVAudioFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioFile.h; sourceTree = "<group>"; };
-		0AE45B762046470F00DB7189 /* KVAudioStreamerPlayList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioStreamerPlayList.h; sourceTree = "<group>"; };
 		0AE45B772046470F00DB7189 /* KVAudioProvider.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioProvider.h; sourceTree = "<group>"; };
 		0AE45B782046470F00DB7189 /* KVAudioStreamHttpTool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioStreamHttpTool.h; sourceTree = "<group>"; };
 		0AE45B792046470F00DB7189 /* NSString+KVURL.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSString+KVURL.m"; sourceTree = "<group>"; };
 		0AE45B7A2046470F00DB7189 /* KVAudioConsumer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioConsumer.h; sourceTree = "<group>"; };
 		0AE45B7B2046470F00DB7189 /* KVAudioStreamer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KVAudioStreamer.m; sourceTree = "<group>"; };
 		0AE45B7C2046470F00DB7189 /* KVAudioFile.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KVAudioFile.m; sourceTree = "<group>"; };
-		0AE45B7D2046470F00DB7189 /* KVAudioStreamerPlayList.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KVAudioStreamerPlayList.m; sourceTree = "<group>"; };
 		0AE45B7E2046470F00DB7189 /* NSString+KVURL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSString+KVURL.h"; sourceTree = "<group>"; };
 		0AE45B7F2046470F00DB7189 /* KVAudioStreamHttpTool.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KVAudioStreamHttpTool.m; sourceTree = "<group>"; };
 		0AE45B802046470F00DB7189 /* KVAudioProvider.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KVAudioProvider.m; sourceTree = "<group>"; };
@@ -213,19 +210,17 @@
 			isa = PBXGroup;
 			children = (
 				0AE45B732046470F00DB7189 /* KVAudioStreamer.h */,
-				0AE45B742046470F00DB7189 /* KVAudioConsumer.m */,
-				0AE45B752046470F00DB7189 /* KVAudioFile.h */,
-				0AE45B762046470F00DB7189 /* KVAudioStreamerPlayList.h */,
-				0AE45B772046470F00DB7189 /* KVAudioProvider.h */,
-				0AE45B782046470F00DB7189 /* KVAudioStreamHttpTool.h */,
-				0AE45B792046470F00DB7189 /* NSString+KVURL.m */,
-				0AE45B7A2046470F00DB7189 /* KVAudioConsumer.h */,
 				0AE45B7B2046470F00DB7189 /* KVAudioStreamer.m */,
+				0AE45B752046470F00DB7189 /* KVAudioFile.h */,
 				0AE45B7C2046470F00DB7189 /* KVAudioFile.m */,
-				0AE45B7D2046470F00DB7189 /* KVAudioStreamerPlayList.m */,
-				0AE45B7E2046470F00DB7189 /* NSString+KVURL.h */,
-				0AE45B7F2046470F00DB7189 /* KVAudioStreamHttpTool.m */,
+				0AE45B772046470F00DB7189 /* KVAudioProvider.h */,
 				0AE45B802046470F00DB7189 /* KVAudioProvider.m */,
+				0AE45B7A2046470F00DB7189 /* KVAudioConsumer.h */,
+				0AE45B742046470F00DB7189 /* KVAudioConsumer.m */,
+				0AE45B782046470F00DB7189 /* KVAudioStreamHttpTool.h */,
+				0AE45B7F2046470F00DB7189 /* KVAudioStreamHttpTool.m */,
+				0AE45B7E2046470F00DB7189 /* NSString+KVURL.h */,
+				0AE45B792046470F00DB7189 /* NSString+KVURL.m */,
 				0AE45B812046470F00DB7189 /* KVAudioStreamDef.h */,
 			);
 			path = KVAudioStreamer;
@@ -421,7 +416,6 @@
 				0AE45B882046470F00DB7189 /* KVAudioProvider.m in Sources */,
 				0AE45B872046470F00DB7189 /* KVAudioStreamHttpTool.m in Sources */,
 				0AE45BB1204647D400DB7189 /* MASViewAttribute.m in Sources */,
-				0AE45B862046470F00DB7189 /* KVAudioStreamerPlayList.m in Sources */,
 				0AE45BAE204647D400DB7189 /* View+MASAdditions.m in Sources */,
 				0AE45B852046470F00DB7189 /* KVAudioFile.m in Sources */,
 				0AE45BA9204647D400DB7189 /* ViewController+MASAdditions.m in Sources */,

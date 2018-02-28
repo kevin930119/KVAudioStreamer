@@ -29,7 +29,7 @@
 
 /**
  音频时长改变通知
- 注意：有些音频文件本身的时长并不准确（可能是音频文件本身的原因），如果开发者已经准确知道时长，建议直接使用，不需要使用流媒体内部计算出的时长
+ 注意：有些音频文件本身的时长并不准确（音频文件本身的原因导致文件大小与比特率不正确，由此计算出的时长有偏差），如果开发者已经准确知道时长，建议直接使用，不需要使用流媒体内部计算出的时长
 
  @param streamer 流媒体
  @param duration 时长
@@ -60,8 +60,9 @@
  @param streamer 流媒体
  @param errorType 错误类型
  @param msg 错误消息
+ @param error 如果是网络错误，将会抛出
  */
-- (void)audioStreamer:(KVAudioStreamer *)streamer didFailWithErrorType:(KVAudioStreamerErrorType)errorType msg:(NSString*)msg;
+- (void)audioStreamer:(KVAudioStreamer *)streamer didFailWithErrorType:(KVAudioStreamerErrorType)errorType msg:(NSString*)msg error:(NSError*)error;
 
 @end
 

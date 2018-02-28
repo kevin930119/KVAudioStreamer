@@ -29,12 +29,14 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     pthread_mutex_t _mutex; //线程锁，为了解决多线程修改_inuse值的读取冲突
     pthread_cond_t _mutexCond;  //线程条件睡眠，为了解决在将数据放进缓存区，没有空余缓存区时的线程等待的性能优化
     pthread_mutex_t _enQueueMutex;  //入队线程锁
+    pthread_mutex_t _audioQueueBufferingMutex;  //网络极差时自动控制播放队列的线程锁
 }
 
 @property (atomic, assign) BOOL isPlaying;
 
 @property (atomic, assign) BOOL audioBufferFillComplete; //缓存区数据已经填充完毕
 @property (atomic, assign) NSInteger waitingForPlayInAudioQueueBufferCount;   //在音频队列中等待播放的缓存区数
+@property (atomic, assign) BOOL waitingForBuffer;    //等待填充缓存区
 @property (atomic, assign) NSInteger audioPacketsFilled; //当前buffer填充了多少帧数据
 @property (atomic, assign) NSInteger audioDataBytesFilled;   //当前buffer填充的数据大小
 @property (atomic, assign) NSInteger audioQueueCurrentBufferIndex;   //缓存区数据的序号
@@ -55,6 +57,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         pthread_mutex_init(&_mutex, NULL);
         pthread_cond_init(&_mutexCond, NULL);
         pthread_mutex_init(&_enQueueMutex, NULL);
+        pthread_mutex_init(&_audioQueueBufferingMutex, NULL);
     }
     return self;
 }
@@ -65,6 +68,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         AudioQueueStart(_audioQueueRef, NULL);
         self.isPause = NO;
         self.isPlaying = YES;
+        self.waitingForBuffer = NO;
         if ([self.delegate respondsToSelector:@selector(beginPlay)]) {
             [self.delegate beginPlay];
         }
@@ -73,9 +77,12 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
 
 - (void)pause {
     if (_audioQueueRef != NULL) {
-        AudioQueuePause(_audioQueueRef);
+        if (!self.waitingForBuffer) {
+            AudioQueuePause(_audioQueueRef);
+        }
         self.isPause = YES;
         self.isPlaying = NO;
+        self.waitingForBuffer = NO;
         if ([self.delegate respondsToSelector:@selector(playPause)]) {
             [self.delegate playPause];
         }
@@ -88,6 +95,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         [self.delegate playStop];
     }
     self.isPause = NO;
+    self.waitingForBuffer = NO;
 }
 
 #pragma mark - 音频属性控制
@@ -112,6 +120,11 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     }
 }
 
+- (void)prepareWithData:(NSData *)data {
+    self.forPrepare = YES;
+    [self fillAudioData:data isDiscontinuity:NO];
+}
+
 - (void)fillAudioData:(NSData *)data isDiscontinuity:(BOOL)isDiscontinuity {
     if (_audiofilestreamid == NULL) {
         AudioFileStreamOpen((__bridge void*)self, KVAudioFileStream_PropertyListenerProc, KVAudioFileStream_PacketsProc, self.file.audioFileTypeId, &_audiofilestreamid);
@@ -125,6 +138,9 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     }
     if (status != noErr) {
         //解析数据出错
+        if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
+            [self.delegate audioProviderDidFailWithErrorMsg:@"数据解析出错"];
+        }
     }
 }
 
@@ -138,6 +154,8 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     self.audioBufferFillComplete = NO;
     self.waitingForPlayInAudioQueueBufferCount = 0;
     self.isPlaying = NO;
+    self.waitingForBuffer = NO;
+    self.forPrepare = NO;
 }
 
 - (BOOL)fillBufferComplete {
@@ -177,6 +195,17 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         if ([self.delegate respondsToSelector:@selector(beginPlay)]) {
             [self.delegate beginPlay];
         }
+    }else {
+        if (self.waitingForBuffer) {
+            self.waitingForBuffer = NO;
+            pthread_mutex_lock(&_audioQueueBufferingMutex);
+            //正在等待填充缓存区
+            if ([self.delegate respondsToSelector:@selector(beginPlay)]) {
+                [self.delegate beginPlay];
+            }
+            AudioQueueStart(_audioQueueRef, NULL);
+            pthread_mutex_unlock(&_audioQueueBufferingMutex);
+        }
     }
     
     self.audioQueueCurrentBufferIndex = (++self.audioQueueCurrentBufferIndex) % kNumberOfBuffers;
@@ -191,6 +220,9 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         //获取音频格式信息
         AudioFileStreamGetProperty(_audiofilestreamid, kAudioFileStreamProperty_DataFormat, &ioPropertyDataSize, &_asbd);
         self.isPrepare = YES;
+        if ([self.delegate respondsToSelector:@selector(prepareAlready)]) {
+            [self.delegate prepareAlready];
+        }
     }else if (inPropertyID == kAudioFileStreamProperty_FormatList) {
         //获取aac的音频格式
         Boolean outWriteable;
@@ -213,6 +245,9 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
                 pasbd.mFormatID == kAudioFormatMPEG4AAC_HE_V2) {
                 _asbd = pasbd;
                 self.isPrepare = YES;
+                if ([self.delegate respondsToSelector:@selector(prepareAlready)]) {
+                    [self.delegate prepareAlready];
+                }
                 break;
             }
         }
@@ -223,6 +258,20 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
 - (void)handleStreamPackets:(UInt32)inNumberBytes inNumberPackets:(UInt32)inNumberPackets inInputData:(const void *)inInputData inPacketDescriptions:(AudioStreamPacketDescription    *)inPacketDescriptions {
     @synchronized (self) {
         if (self.isFinish) {
+            return;
+        }
+        if (self.forPrepare) {
+            if (!self.isPrepare) {
+                if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
+                    [self.delegate audioProviderDidFailWithErrorMsg:@"音频格式错误"];
+                }
+            }
+            return;
+        }
+        if (!self.isPrepare) {
+            if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
+                [self.delegate audioProviderDidFailWithErrorMsg:@"音频格式错误"];
+            }
             return;
         }
         if (_audioQueueRef == NULL) {
@@ -360,15 +409,27 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     if (self.waitingForPlayInAudioQueueBufferCount < 0) {
         self.waitingForPlayInAudioQueueBufferCount = 0;
     }
-    if (self.waitingForPlayInAudioQueueBufferCount == 0 && self.audioBufferFillComplete) {
+    if (self.waitingForPlayInAudioQueueBufferCount == 0) {
         //播放完成了
-        if ([self.delegate respondsToSelector:@selector(playFinish)] && !self.isFinish) {
-            [self.delegate playFinish];
+        if (self.audioBufferFillComplete) {
+            //数据全加载完成
+            if ([self.delegate respondsToSelector:@selector(playFinish)] && !self.isFinish) {
+                [self.delegate playFinish];
+            }
+            //播放完成，清除资源
+            [self resetAudioQueue];
+            self.isPause = NO;
+            [self closeFileStream];
+        }else {
+            self.waitingForBuffer = YES;
+            pthread_mutex_lock(&_audioQueueBufferingMutex);
+            //缓存区全部播放完成，但是数据没有加载完成，等待解析数据
+            if ([self.delegate respondsToSelector:@selector(playDone)] && !self.isFinish) {
+                [self.delegate playDone];
+            }
+            AudioQueuePause(_audioQueueRef);
+            pthread_mutex_unlock(&_audioQueueBufferingMutex);
         }
-        //播放完成，清除资源
-        [self resetAudioQueue];
-        self.isPause = NO;
-        [self closeFileStream];
     }
 }
 
@@ -387,6 +448,30 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         for (NSInteger i = 0; i < kNumberOfBuffers; i++) {
             //为每一个缓冲区分配空间
             AudioQueueAllocateBuffer(_audioQueueRef, kAQBufSize, &_audioqueuebufferref[i]);
+        }
+        
+        //增加cookie数据
+        UInt32 cookieSize;
+        Boolean writable;
+        OSStatus ignorableError;
+        ignorableError = AudioFileStreamGetPropertyInfo(_audiofilestreamid, kAudioFileStreamProperty_MagicCookieData, &cookieSize, &writable);
+        if (ignorableError)
+        {
+            return;
+        }
+        
+        void* cookieData = calloc(1, cookieSize);
+        ignorableError = AudioFileStreamGetProperty(_audiofilestreamid, kAudioFileStreamProperty_MagicCookieData, &cookieSize, cookieData);
+        if (ignorableError)
+        {
+            return;
+        }
+        
+        ignorableError = AudioQueueSetProperty(_audioQueueRef, kAudioQueueProperty_MagicCookie, cookieData, cookieSize);
+        free(cookieData);
+        if (ignorableError)
+        {
+            return;
         }
     }
 }
@@ -450,6 +535,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     pthread_cond_destroy(&_mutexCond);
     pthread_mutex_destroy(&_mutex);
     pthread_mutex_destroy(&_enQueueMutex);
+    pthread_mutex_destroy(&_audioQueueBufferingMutex);
 }
 
 @end
