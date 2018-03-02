@@ -11,5 +11,6 @@
 @interface KVAudioPlayerController : UIViewController
 
 @property (nonatomic, copy) NSString * filepath;
+@property (nonatomic, strong) NSArray * filepaths;
 
 @end

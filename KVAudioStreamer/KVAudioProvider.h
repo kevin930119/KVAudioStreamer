@@ -37,6 +37,12 @@
 @property (nonatomic, weak) KVAudioFile * file;
 @property (nonatomic, assign) long long currentFileLocation;
 @property (nonatomic, assign) BOOL cacheEnable;
+@property (atomic, assign) BOOL forPrepare;
+@property (nonatomic, strong) NSDictionary * httpHeaders;
+/**
+ 网络数据接收完成
+ */
+@property (atomic, assign) BOOL netDataReceiveComplete;
 
 + (instancetype)initWithAudioFile:(KVAudioFile*)file delegate:(id<KVAudioProviderDelegate>)delegate;
 

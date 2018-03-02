@@ -21,6 +21,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
 @public
     AudioFileStreamID _audiofilestreamid;
     AudioStreamBasicDescription _asbd;  //音频的格式信息
+    double _packetDuration;
     AudioQueueBufferRef _audioqueuebufferref[kNumberOfBuffers]; //音频缓存组
     BOOL _inuse[kNumberOfBuffers];  //标记某个音频缓存区是否已入队
     AudioStreamPacketDescription _audiostreampacketdesc[kMaxPacketDesc];    //保存每一帧的信息
@@ -40,6 +41,9 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
 @property (atomic, assign) NSInteger audioPacketsFilled; //当前buffer填充了多少帧数据
 @property (atomic, assign) NSInteger audioDataBytesFilled;   //当前buffer填充的数据大小
 @property (atomic, assign) NSInteger audioQueueCurrentBufferIndex;   //缓存区数据的序号
+
+@property (atomic, assign) SInt32 audioTotalBytes;
+@property (atomic, assign) SInt32 audioTotalPackets;
 
 @end
 
@@ -127,19 +131,36 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
 
 - (void)fillAudioData:(NSData *)data isDiscontinuity:(BOOL)isDiscontinuity {
     if (_audiofilestreamid == NULL) {
-        AudioFileStreamOpen((__bridge void*)self, KVAudioFileStream_PropertyListenerProc, KVAudioFileStream_PacketsProc, self.file.audioFileTypeId, &_audiofilestreamid);
+        AudioFileStreamOpen((__bridge void*)self, KVAudioFileStream_PropertyListenerProc, KVAudioFileStream_PacketsProc, 0, &_audiofilestreamid);
     }
     //解析数据
     OSStatus status = noErr;
-    if (isDiscontinuity) {
-        AudioFileStreamParseBytes(_audiofilestreamid, (UInt32)data.length, [data bytes], kAudioFileStreamParseFlag_Discontinuity);
-    }else {
-        AudioFileStreamParseBytes(_audiofilestreamid, (UInt32)data.length, [data bytes], 0);
-    }
+    /*
+     kAudioFileStreamParseFlag_Discontinuity
+     网上的资料说如果是seek操作的，在解析时需要传入这个，而不是0，但是经过实测，如果是wav文件，那么传入这个值会导致解析出错，所以不用
+     */
+    status = AudioFileStreamParseBytes(_audiofilestreamid, (UInt32)data.length, [data bytes], 0);
     if (status != noErr) {
         //解析数据出错
         if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
             [self.delegate audioProviderDidFailWithErrorMsg:@"数据解析出错"];
+        }
+    }else {
+        if (!self.forPrepare && !self.isFinish) {
+            //继续获取数据解析
+            if (![self fillBufferComplete]) {
+                //已经是音频文件的最后一段数据了，直接入队
+                self.audioBufferFillComplete = YES; //数据填充完成标识
+                if (self.audioDataBytesFilled) {
+                    BOOL flag = [self getInAudioQueue]; //加入播放队列
+                    if (!flag) {
+                        //报错
+                        if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
+                            [self.delegate audioProviderDidFailWithErrorMsg:@"音频数据入队失败"];
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -148,6 +169,8 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
  重新设置音频队列相关配置
  */
 - (void)resetAudioQueueConfig {
+    self.audioTotalPackets = 0;
+    self.audioTotalBytes = 0;
     self.audioDataBytesFilled = 0;
     self.audioPacketsFilled = 0;
     self.audioQueueCurrentBufferIndex = 0;
@@ -167,13 +190,14 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     return flag;
 }
 
-- (void)getInAudioQueue {
+- (BOOL)getInAudioQueue {
+    BOOL flag = NO;
     if (self.isFinish) {
-        return;
+        return NO;
     }
     AudioQueueBufferRef currentBuffer = _audioqueuebufferref[self.audioQueueCurrentBufferIndex];
     if (!currentBuffer) {
-        return;
+        return NO;
     }
     _inuse[self.audioQueueCurrentBufferIndex] = YES;
     self.waitingForPlayInAudioQueueBufferCount++;  //增加待播放的缓存区个数
@@ -184,9 +208,11 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         status = AudioQueueEnqueueBuffer(_audioQueueRef, currentBuffer, 0, NULL);
     }
     if (status == noErr) {
+        flag = YES;
     }else {
         _inuse[self.audioQueueCurrentBufferIndex] = NO;
         self.waitingForPlayInAudioQueueBufferCount--;
+        return flag;
     }
     
     if (!self.isPlaying && !self.isFinish && !self.isPause) {
@@ -211,6 +237,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     self.audioQueueCurrentBufferIndex = (++self.audioQueueCurrentBufferIndex) % kNumberOfBuffers;
     self.audioPacketsFilled = 0;
     self.audioDataBytesFilled = 0;
+    return flag;
 }
 
 #pragma mark - audiofilestream回调
@@ -219,6 +246,8 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         UInt32 ioPropertyDataSize = sizeof(_asbd);
         //获取音频格式信息
         AudioFileStreamGetProperty(_audiofilestreamid, kAudioFileStreamProperty_DataFormat, &ioPropertyDataSize, &_asbd);
+        _packetDuration = _asbd.mFramesPerPacket / _asbd.mSampleRate;
+        
         self.isPrepare = YES;
         if ([self.delegate respondsToSelector:@selector(prepareAlready)]) {
             [self.delegate prepareAlready];
@@ -244,6 +273,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
             if (pasbd.mFormatID == kAudioFormatMPEG4AAC_HE ||
                 pasbd.mFormatID == kAudioFormatMPEG4AAC_HE_V2) {
                 _asbd = pasbd;
+                _packetDuration = _asbd.mFramesPerPacket / _asbd.mSampleRate;
                 self.isPrepare = YES;
                 if ([self.delegate respondsToSelector:@selector(prepareAlready)]) {
                     [self.delegate prepareAlready];
@@ -277,14 +307,68 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         if (_audioQueueRef == NULL) {
             [self createQueue];
         }
-        if (inNumberPackets) {
+        self.audioTotalBytes += inNumberBytes;
+        self.audioTotalPackets += inNumberPackets;
+        if (!self.file.durationComplete) {
+            //获取比特率
+            UInt32 bitRate = 0;
+            UInt32 ioBitRateSize = sizeof(bitRate);
+            AudioFileStreamGetProperty(_audiofilestreamid, kAudioFileStreamProperty_BitRate, &ioBitRateSize, &bitRate);
+            if (bitRate != 0) {
+                self.file.bitRate = bitRate;
+            }else {
+                self.file.bitRate = 0;
+            }
+            
+            //计算时长
+            float duration = self.file.filesize * 8.0 / self.file.bitRate;
+            if (isnan(duration) || isinf(duration)) {
+                duration = 0;
+            }
+            if (duration > 0) {
+                self.file.duration = duration;
+                self.file.durationComplete = YES;
+            }
+            
+            if (!duration) {
+                //如果计算不到时长，那么使用以下方式计算
+                if (_asbd.mBytesPerFrame) {
+                    double durationPerPacket = _asbd.mFramesPerPacket / _asbd.mSampleRate;
+                    long frameCount = (long)(self.file.filesize / _asbd.mBytesPerFrame);
+                    long packetCount = frameCount / _asbd.mFramesPerPacket;
+                    duration = durationPerPacket * packetCount;
+                    self.file.durationComplete = YES;
+                }else {
+                    duration = -1;
+                }
+            }
+            if (duration == -1) {
+                double averagePacketByteSize = self.audioTotalBytes / (float)self.audioTotalPackets;
+                double durationPerPacket = _asbd.mFramesPerPacket / _asbd.mSampleRate;
+                double bitRate_ca = 8.0 * averagePacketByteSize / durationPerPacket;
+                duration = self.file.filesize * 8.0 / bitRate_ca;
+                if (isnan(duration) || isinf(duration)) {
+                    duration = 0;
+                }
+            }
+            self.file.estimateDuration = duration;
+        }
+        
+        if (inNumberPackets && inPacketDescriptions) {
             for (NSInteger i = 0; i < inNumberPackets; i++) {
                 SInt64 mStartOffset = inPacketDescriptions[i].mStartOffset;
                 UInt32 mDataByteSize = inPacketDescriptions[i].mDataByteSize;
                 
-                if (mDataByteSize > kAQBufSize - self.audioDataBytesFilled) {
+                if (mDataByteSize > self.file.singleBufferSize - self.audioDataBytesFilled) {
                     //要填充的数据已经大于当前缓冲区的剩余空间了
-                    [self getInAudioQueue]; //加入播放队列
+                    BOOL flag = [self getInAudioQueue]; //加入播放队列
+                    if (!flag) {
+                        //报错
+                        if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
+                            [self.delegate audioProviderDidFailWithErrorMsg:@"音频数据入队失败"];
+                        }
+                        return;
+                    }
                 }
                 
                 pthread_mutex_lock(&_mutex);
@@ -293,7 +377,6 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
                     pthread_cond_wait(&_mutexCond, &_mutex);
                 };
                 pthread_mutex_unlock(&_mutex);
-                
                 if (self.isFinish) {
                     return;
                 }
@@ -309,26 +392,11 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
                 _audiostreampacketdesc[self.audioPacketsFilled].mStartOffset = self.audioDataBytesFilled;
                 self.audioDataBytesFilled += mDataByteSize;
                 self.audioPacketsFilled += 1;
-                
-                if (i == inNumberPackets - 1 && inNumberPackets != 1) {
-                    //最后一段数据了，通知外面，解析的数据已经完全填充进缓存区了
-                    if (![self fillBufferComplete]) {
-                        //已经是音频文件的最后一段数据了，直接入队
-                        self.audioBufferFillComplete = YES; //数据填充完成标识
-                        [self getInAudioQueue];
-                    }
-                }
             }
         }else {
             long offset = 0;
             while (inNumberBytes)
             {
-                long bufSpaceRemaining = kAudioFileBufferSize - self.audioDataBytesFilled;
-                if (bufSpaceRemaining < 0)
-                {
-                    [self getInAudioQueue];
-                }
-                
                 pthread_mutex_lock(&_mutex);
                 while (_inuse[self.audioQueueCurrentBufferIndex]) {
                     //线程等待，避免一直调用，造成的性能损耗
@@ -340,7 +408,8 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
                     return;
                 }
                 
-                bufSpaceRemaining = kAudioFileBufferSize - self.audioDataBytesFilled;
+                long bufSpaceRemaining = self.file.singleBufferSize;
+                
                 long copySize;
                 if (bufSpaceRemaining < inNumberBytes)
                 {
@@ -355,43 +424,23 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
                 if (!fillBuf) {
                     return;
                 }
-                fillBuf->mAudioDataByteSize = (UInt32)self.audioPacketsFilled;
-                memcpy((char*)fillBuf->mAudioData + self.audioDataBytesFilled, (const char*)(inInputData + offset), copySize);
+                fillBuf->mAudioDataByteSize = (UInt32)(copySize);
+                memcpy((char*)fillBuf->mAudioData, (const char*)(inInputData + offset), copySize);
                 
-                self.audioDataBytesFilled += copySize;
+                self.audioDataBytesFilled = copySize;
                 self.audioPacketsFilled = 0;
                 inNumberBytes -= copySize;
                 offset += copySize;
                 
-                if (!inNumberBytes) {
-                    //没有数据了
-                    if (![self fillBufferComplete]) {
-                        //已经是音频文件的最后一段数据了，直接入队
-                        self.audioBufferFillComplete = YES; //数据填充完成标识
-                        [self getInAudioQueue];
+                BOOL flag = [self getInAudioQueue]; //加入播放队列
+                if (!flag) {
+                    //报错
+                    if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
+                        [self.delegate audioProviderDidFailWithErrorMsg:@"音频数据入队失败"];
                     }
                 }
             }
         }
-    }
-    
-    if (!self.file.duration) {
-        //获取比特率
-        UInt32 bitRate = 0;
-        UInt32 ioBitRateSize = sizeof(bitRate);
-        AudioFileStreamGetProperty(_audiofilestreamid, kAudioFileStreamProperty_BitRate, &ioBitRateSize, &bitRate);
-        if (bitRate != 0) {
-            self.file.bitRate = bitRate;
-        }else {
-            self.file.bitRate = 0;
-        }
-        
-        //计算时长
-        float duration = self.file.filesize * 8.0 / self.file.bitRate;
-        if (isnan(duration)) {
-            duration = 0;
-        }
-        self.file.duration = duration;
     }
 }
 
@@ -447,7 +496,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         }
         for (NSInteger i = 0; i < kNumberOfBuffers; i++) {
             //为每一个缓冲区分配空间
-            AudioQueueAllocateBuffer(_audioQueueRef, kAQBufSize, &_audioqueuebufferref[i]);
+            AudioQueueAllocateBuffer(_audioQueueRef, self.file.singleBufferSize, &_audioqueuebufferref[i]);
         }
         
         //增加cookie数据

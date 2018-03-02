@@ -37,6 +37,14 @@
 - (void)audioStreamer:(KVAudioStreamer *)streamer durationChange:(float)duration;
 
 /**
+ 音频近似时长改变通知
+ 注意：当解析音频获取不到比特率（用于计算时长）时，流媒体内部将近似地计算音频的时长，内部有两种计算方法，其中之一会导致多次调用该回调，确保时间准确
+ @param streamer 流媒体
+ @param estimateDuration 时长
+ */
+- (void)audioStreamer:(KVAudioStreamer *)streamer estimateDurationChange:(float)estimateDuration;
+
+/**
  播放进度通知
 
  @param streamer 流媒体
@@ -46,6 +54,7 @@
 
 /**
  文件缓存完成通知，流媒体内部不会处理网络路径与本地路径的映射关系，需要开发者自行处理，例如，第一次播放网络音频，在收到缓存完成后，将缓存文件的路径信息（文件夹，文件名都需要保存，方便下次做路径拼接）保存，下次如果继续播放该网络音频，先获取本地路径，通过本地路径进行音频播放
+ 说明：当网络文件缓存从头到尾完全加载后，继续seek操作将不会再做网络请求了，如果还未完全加载完毕就使用seek操作，那么将会重新启动网络请求，该文件再不会被判定为完全加载，因为保存起来的文件流数据已经不能当做一个完整文件看待。
 
  @param streamer 流媒体
  @param relativePath 缓存文件相对路径，缓存文件默认保存在系统Ducoment文件夹下
@@ -110,6 +119,12 @@
  是否允许缓存，开启后，在播放网络音频获取数据完整后将会自动保存，文件路径通过代理事件通知
  */
 @property (nonatomic, assign) BOOL cacheEnable;
+
+/**
+ 设置网络请求头部信息，不需要可以不设置
+ 如果网络音频文件开启了防盗链功能，需要传递Referer信息，使用该属性设置
+ */
+@property (nonatomic, strong) NSDictionary * httpHeaders;
 
 #pragma mark - 音频播放相关
 /**

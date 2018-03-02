@@ -30,6 +30,8 @@
         return nil;
     }
     file.audiourl = fileurl;
+    file.minRequestDataBytes = 262144;
+    file.singleBufferSize = 61440;
     NSArray * fileTypeComs = [fileurl componentsSeparatedByString:@"."];
     if (fileTypeComs.count > 1) {
         NSString * fileType = fileTypeComs.lastObject;
@@ -40,12 +42,13 @@
     }
     file.bitRate = 0;
     file.filesize = 0;
+    file.duration = 0;
     return file;
 }
 
 - (AudioFileTypeID)hintForFileExtension:(NSString *)fileExtension
 {
-    AudioFileTypeID fileTypeHint = kAudioFileAAC_ADTSType;
+    AudioFileTypeID fileTypeHint = 0;
     if ([fileExtension isEqual:@"mp3"])
     {
         fileTypeHint = kAudioFileMP3Type;
@@ -65,6 +68,8 @@
     else if ([fileExtension isEqual:@"m4a"])
     {
         fileTypeHint = kAudioFileM4AType;
+        self.singleBufferSize = 61440;
+        self.minRequestDataBytes = 614400;
     }
     else if ([fileExtension isEqual:@"mp4"])
     {
@@ -77,6 +82,8 @@
     else if ([fileExtension isEqual:@"aac"])
     {
         fileTypeHint = kAudioFileAAC_ADTSType;
+        self.singleBufferSize = 61440;
+        self.minRequestDataBytes = 614400;
     }
     return fileTypeHint;
 }

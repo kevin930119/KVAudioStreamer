@@ -22,6 +22,6 @@
 
 + (instancetype)shareTool;
 
-- (NSURLSessionTask*)downloadURL:(NSURL*)url offset:(long long)offset;
+- (NSURLSessionTask*)downloadURL:(NSURL*)url offset:(long long)offset headers:(NSDictionary*)headers;
 
 @end

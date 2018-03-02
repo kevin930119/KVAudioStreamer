@@ -31,10 +31,15 @@ typedef NS_ENUM(NSInteger, KVAudioProviderReponse) {
     KVAudioProviderReponseWaiting   //等待数据
 };
 
+#define kv_dispatch_main_async_safe(block)\
+if ([NSThread isMainThread]) {\
+block();\
+} else {\
+dispatch_async(dispatch_get_main_queue(), block);\
+}
+
 #define kNumberOfBuffers 3              //AudioQueueBuffer数量
-#define kAQBufSize 10240           //每个AudioQueueBuffer的大小
-#define kAudioFileBufferSize 61440       //文件读取数据的缓冲区大小
-#define kMaxPacketDesc 512              //最大的AudioStreamPacketDescription个数
+#define kMaxPacketDesc 5120              //最大的AudioStreamPacketDescription个数
 
 #define KVAudioStreamerFileCacheDirName @"kvaudiostreamercache" //网络音频文件的缓存文件夹
 

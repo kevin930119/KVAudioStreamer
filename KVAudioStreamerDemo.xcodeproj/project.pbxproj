@@ -22,7 +22,6 @@
 		0AE45B872046470F00DB7189 /* KVAudioStreamHttpTool.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B7F2046470F00DB7189 /* KVAudioStreamHttpTool.m */; };
 		0AE45B882046470F00DB7189 /* KVAudioProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B802046470F00DB7189 /* KVAudioProvider.m */; };
 		0AE45B8B204647B000DB7189 /* KVAudioPlayerController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B8A204647B000DB7189 /* KVAudioPlayerController.m */; };
-		0AE45B8D204647C700DB7189 /* 002-埃及2.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 0AE45B8C204647C600DB7189 /* 002-埃及2.mp3 */; };
 		0AE45BA8204647D400DB7189 /* NSLayoutConstraint+MASDebugAdditions.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B90204647D400DB7189 /* NSLayoutConstraint+MASDebugAdditions.m */; };
 		0AE45BA9204647D400DB7189 /* ViewController+MASAdditions.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B99204647D400DB7189 /* ViewController+MASAdditions.m */; };
 		0AE45BAA204647D400DB7189 /* MASCompositeConstraint.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B9D204647D400DB7189 /* MASCompositeConstraint.m */; };
@@ -36,6 +35,8 @@
 		0AE45BB42046481700DB7189 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0AE45BB32046481700DB7189 /* MediaPlayer.framework */; };
 		0AE45BB62046481C00DB7189 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0AE45BB52046481C00DB7189 /* AudioToolbox.framework */; };
 		0AE45BB82046482200DB7189 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0AE45BB72046482200DB7189 /* AVFoundation.framework */; };
+		0AE45BF820469D6B00DB7189 /* 陈奕迅 - 无人之境.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 0AE45BF720469D6B00DB7189 /* 陈奕迅 - 无人之境.mp3 */; };
+		0AE45BFD2046B63700DB7189 /* 陈奕迅 - 稳稳的幸福.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 0AE45BFC2046B63600DB7189 /* 陈奕迅 - 稳稳的幸福.mp3 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,7 +88,6 @@
 		0AE45B812046470F00DB7189 /* KVAudioStreamDef.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioStreamDef.h; sourceTree = "<group>"; };
 		0AE45B89204647B000DB7189 /* KVAudioPlayerController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KVAudioPlayerController.h; sourceTree = "<group>"; };
 		0AE45B8A204647B000DB7189 /* KVAudioPlayerController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KVAudioPlayerController.m; sourceTree = "<group>"; };
-		0AE45B8C204647C600DB7189 /* 002-埃及2.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "002-埃及2.mp3"; sourceTree = "<group>"; };
 		0AE45B8F204647D400DB7189 /* MASCompositeConstraint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MASCompositeConstraint.h; sourceTree = "<group>"; };
 		0AE45B90204647D400DB7189 /* NSLayoutConstraint+MASDebugAdditions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSLayoutConstraint+MASDebugAdditions.m"; sourceTree = "<group>"; };
 		0AE45B91204647D400DB7189 /* MASConstraint+Private.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "MASConstraint+Private.h"; sourceTree = "<group>"; };
@@ -116,6 +116,8 @@
 		0AE45BB32046481700DB7189 /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
 		0AE45BB52046481C00DB7189 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		0AE45BB72046482200DB7189 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		0AE45BF720469D6B00DB7189 /* 陈奕迅 - 无人之境.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "陈奕迅 - 无人之境.mp3"; sourceTree = "<group>"; };
+		0AE45BFC2046B63600DB7189 /* 陈奕迅 - 稳稳的幸福.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "陈奕迅 - 稳稳的幸福.mp3"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -175,7 +177,8 @@
 				0AE45B41204646CC00DB7189 /* AppDelegate.m */,
 				0AE45B43204646CC00DB7189 /* ViewController.h */,
 				0AE45B44204646CC00DB7189 /* ViewController.m */,
-				0AE45B8C204647C600DB7189 /* 002-埃及2.mp3 */,
+				0AE45BFC2046B63600DB7189 /* 陈奕迅 - 稳稳的幸福.mp3 */,
+				0AE45BF720469D6B00DB7189 /* 陈奕迅 - 无人之境.mp3 */,
 				0AE45B89204647B000DB7189 /* KVAudioPlayerController.h */,
 				0AE45B8A204647B000DB7189 /* KVAudioPlayerController.m */,
 				0AE45B46204646CC00DB7189 /* Main.storyboard */,
@@ -379,10 +382,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0AE45BFD2046B63700DB7189 /* 陈奕迅 - 稳稳的幸福.mp3 in Resources */,
 				0AE45B4D204646CC00DB7189 /* LaunchScreen.storyboard in Resources */,
 				0AE45B4A204646CC00DB7189 /* Assets.xcassets in Resources */,
+				0AE45BF820469D6B00DB7189 /* 陈奕迅 - 无人之境.mp3 in Resources */,
 				0AE45B48204646CC00DB7189 /* Main.storyboard in Resources */,
-				0AE45B8D204647C700DB7189 /* 002-埃及2.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

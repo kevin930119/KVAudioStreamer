@@ -33,10 +33,16 @@
     return self;
 }
 
-- (NSURLSessionTask*)downloadURL:(NSURL *)url offset:(long long)offset {
+- (NSURLSessionTask*)downloadURL:(NSURL *)url offset:(long long)offset headers:(NSDictionary *)headers {
     NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:url];
     if (offset) {
         [request setValue:[NSString stringWithFormat:@"bytes=%lld-", offset] forHTTPHeaderField:@"Range"];
+    }
+    if (headers.count) {
+        for (NSString * key in headers.allKeys) {
+            id value = headers[key];
+            [request setValue:value forHTTPHeaderField:key];
+        }
     }
     NSURLSessionDataTask * task = [self.urlSession dataTaskWithRequest:request];
     [task resume];
@@ -48,8 +54,11 @@ didReceiveResponse:(NSURLResponse *)response
  completionHandler:(void (^)(NSURLSessionResponseDisposition disposition))completionHandler {
     completionHandler(NSURLSessionResponseAllow);
     NSHTTPURLResponse * res = (NSHTTPURLResponse*)response;
-    if ([self.delegate respondsToSelector:@selector(receiveHttpHeader:)]) {
-        [self.delegate receiveHttpHeader:res.allHeaderFields];
+    if (res.statusCode == 200) {
+        //正确的
+        if ([self.delegate respondsToSelector:@selector(receiveHttpHeader:)]) {
+            [self.delegate receiveHttpHeader:res.allHeaderFields];
+        }
     }
 }
 
@@ -62,6 +71,15 @@ didReceiveResponse:(NSURLResponse *)response
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
 didCompleteWithError:(nullable NSError *)error {
+    if (task.response) {
+        NSHTTPURLResponse * res = (NSHTTPURLResponse*)task.response;
+        if (res.statusCode >= 400 && !error) {
+            //错误的
+            error = [NSError errorWithDomain:NSURLErrorDomain code:res.statusCode userInfo:nil];
+        }
+    }else {
+        error = [NSError errorWithDomain:NSURLErrorDomain code:404 userInfo:nil];
+    }
     if ([self.delegate respondsToSelector:@selector(didCompleteWithHttpError:)]) {
         [self.delegate didCompleteWithHttpError:error];
     }

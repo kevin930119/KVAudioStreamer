@@ -18,10 +18,6 @@
 @property (nonatomic, strong) NSDictionary * headers;   //头部信息
 
 @property (nonatomic, strong) NSURLSessionTask * lastTask;
-/**
- 网络数据接收完成
- */
-@property (atomic, assign) BOOL netDataReceiveComplete;
 @property (atomic, assign) BOOL isDownloading;
 @property (atomic, assign) BOOL waitingForNetData;
 @property (nonatomic, strong) NSMutableData * netData;
@@ -92,7 +88,7 @@
             [self.delegate audioProviderReceiveData:data];
         }
     }else {
-        dispatch_async(dispatch_get_main_queue(), ^{
+        kv_dispatch_main_async_safe(^{
             if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorType:msg:error:)]) {
                 [self.delegate audioProviderDidFailWithErrorType:KVAudioStreamerErrorTypeLocalFile msg:@"获取不到本地文件数据" error:nil];
             }
@@ -120,11 +116,11 @@
         self.isDownloading = YES;
         response = KVAudioProviderReponseWaiting;
         self.netDataRequestStart = offset;
-        self.lastTask = [[KVAudioStreamHttpTool shareTool] downloadURL:url offset:offset];
+        self.lastTask = [[KVAudioStreamHttpTool shareTool] downloadURL:url offset:offset headers:self.httpHeaders];
         [KVAudioStreamHttpTool shareTool].delegate = self;
         self.waitingForNetData = YES;
     }else {
-        if ((self.netData.length + self.netDataRequestStart) - offset > kAudioFileBufferSize || self.netDataReceiveComplete) {
+        if ((self.netData.length + self.netDataRequestStart) - offset > self.file.minRequestDataBytes || self.netDataReceiveComplete) {
             pthread_mutex_lock(&_dataAppendMutex);
             NSData * data = [self.netData subdataWithRange:NSMakeRange(offset - self.netDataRequestStart, self.netData.length - (offset - self.netDataRequestStart))];
             self.currentFileLocation = offset + data.length;
@@ -167,16 +163,23 @@
         self.netData = [NSMutableData dataWithData:data];
     }
     if (self.waitingForNetData) {
-        if (((self.netData.length + self.netDataRequestStart) - self.currentFileLocation > kAudioFileBufferSize) || self.netDataReceiveComplete) {
-            self.waitingForNetData = NO;
-            NSData * data = [self.netData subdataWithRange:NSMakeRange(self.currentFileLocation - self.netDataRequestStart, self.netData.length - (self.currentFileLocation - self.netDataRequestStart))];
-            self.currentFileLocation += data.length;
-            if ([self.delegate respondsToSelector:@selector(audioProviderReceiveData:)]) {
-                [self.delegate audioProviderReceiveData:data];
+        if (self.file.filesize > self.file.minRequestDataBytes) {
+            //当音频文件大于最小数据单位时
+            if (((self.netData.length + self.netDataRequestStart) - self.currentFileLocation > self.file.minRequestDataBytes) || self.netDataReceiveComplete) {
+                [self sendData];
             }
         }
     }
     pthread_mutex_unlock(&_dataAppendMutex);
+}
+
+- (void)sendData {
+    self.waitingForNetData = NO;
+    NSData * data = [self.netData subdataWithRange:NSMakeRange(self.currentFileLocation - self.netDataRequestStart, self.netData.length - (self.currentFileLocation - self.netDataRequestStart))];
+    self.currentFileLocation += data.length;
+    if ([self.delegate respondsToSelector:@selector(audioProviderReceiveData:)]) {
+        [self.delegate audioProviderReceiveData:data];
+    }
 }
 
 - (void)receiveHttpHeader:(NSDictionary *)header {
@@ -204,14 +207,17 @@
 - (void)didCompleteWithHttpError:(NSError *)error {
     if (error) {
         if (error.code != -999 && ![error.localizedDescription isEqualToString:@"cancelled"]) {
-            dispatch_async(dispatch_get_main_queue(), ^{
+            kv_dispatch_main_async_safe(^{
                 if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorType:msg:error:)]) {
                     [self.delegate audioProviderDidFailWithErrorType:KVAudioStreamerErrorTypeNetwork msg:@"网络请求错误" error:error];
                 }
             });
         }
     }else {
-        if (self.netData.length && self.netDataRequestStart == 0) {
+        if (self.waitingForNetData) {
+            [self sendData];
+        }
+        if (self.netData.length && self.netDataRequestStart == 0 && !self.forPrepare) {
             self.netDataReceiveComplete = YES;
             if (self.cacheEnable) {
                 //允许缓存

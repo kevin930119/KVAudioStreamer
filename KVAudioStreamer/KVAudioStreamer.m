@@ -66,15 +66,21 @@
         flag = YES;
         if (self.currentAudioFile) {
             [self.currentAudioFile removeObserver:self forKeyPath:@"duration"];
+            [self.currentAudioFile removeObserver:self forKeyPath:@"estimateDuration"];
         }
         self.currentAudioProvider = nil;
         self.currentAudioConsumer = nil;
         self.currentAudioFile = nil;
         self.currentSeekTime = 0;
+        self.forPrepare = NO;
         self.currentAudioFile = file;
         [self.currentAudioFile addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:nil];
+        [self.currentAudioFile addObserver:self forKeyPath:@"estimateDuration" options:NSKeyValueObservingOptionNew context:nil];
         self.currentAudioUrl = audiourl;
         self.currentAudioProvider = [KVAudioProvider initWithAudioFile:file delegate:self];
+        if ([self.httpHeaders isKindOfClass:[NSDictionary class]]) {
+            self.currentAudioProvider.httpHeaders = self.httpHeaders;
+        }
         self.currentAudioProvider.cacheEnable = self.cacheEnable;
         self.currentAudioConsumer = [KVAudioConsumer initWithAudioFile:file delegate:self];
         self.currentAudioConsumer.playRate = self.playRate;
@@ -98,9 +104,12 @@
         self.currentSeekTime = 0;
         self.forPrepare = NO;
         self.currentAudioConsumer.isFinish = NO;
-        [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+        if (self.currentAudioFile.isNetwork && !self.currentAudioProvider.netDataReceiveComplete) {
+            //是网络数据并且还未完全加载
+            [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+        }
         //开始获取数据
-        [self.currentAudioProvider getDataWithOffset:0 length:kAudioFileBufferSize];
+        [self.currentAudioProvider getDataWithOffset:0 length:self.currentAudioFile.minRequestDataBytes];
     }
 }
 
@@ -125,10 +134,14 @@
         }
         self.currentSeekTime = location;
         self.currentAudioConsumer.isFinish = NO;
-        [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+        if (self.currentAudioFile.isNetwork && !self.currentAudioProvider.netDataReceiveComplete) {
+            //是网络数据并且还未完全加载
+            [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+        }
         //开始获取数据，这里从头获取数据是为了提前知道音频格式，方便计算seek的位置
         self.forPrepare = YES;
-        [self.currentAudioProvider getDataWithOffset:0 length:kAudioFileBufferSize];
+        self.currentAudioProvider.forPrepare = YES; //将忽略缓存，因为已经不可能从头开始加载完整了
+        [self.currentAudioProvider getDataWithOffset:0 length:self.currentAudioFile.minRequestDataBytes];
     }
 }
 
@@ -138,7 +151,7 @@
  @param location 目标位置，以秒为单位
  */
 - (void)seekToTime:(long)location {
-    if ((self.status != KVAudioStreamerPlayStatusBuffering && self.status != KVAudioStreamerPlayStatusPlaying && self.status != KVAudioStreamerPlayStatusPause) || !self.currentAudioConsumer.isPrepare) {
+    if (self.status != KVAudioStreamerPlayStatusBuffering && self.status != KVAudioStreamerPlayStatusPlaying && self.status != KVAudioStreamerPlayStatusPause && !self.currentAudioConsumer.isPrepare) {
         //只有缓冲中和播放中，暂停中或者消费者（音频流）准备完成才有效
         return;
     }
@@ -151,8 +164,14 @@
         SInt64 bytesLocation = [weakSelf.currentAudioConsumer getSeekDataBytesWithLocation:location];
         weakSelf.currentAudioProvider.currentFileLocation = bytesLocation;
         weakSelf.isDiscontinuity = YES;
-        [weakSelf notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
-        [weakSelf.currentAudioProvider getDataWithOffset:bytesLocation length:kAudioFileBufferSize];
+        if (bytesLocation == 0) {
+            weakSelf.currentSeekTime = 0;
+        }
+        if (weakSelf.currentAudioFile.isNetwork && !weakSelf.currentAudioProvider.netDataReceiveComplete) {
+            //是网络数据并且还未完全加载
+            [weakSelf notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+        }
+        [weakSelf.currentAudioProvider getDataWithOffset:bytesLocation length:weakSelf.currentAudioFile.minRequestDataBytes];
     });
 }
 
@@ -175,6 +194,7 @@
     if (self.status == KVAudioStreamerPlayStatusStop || self.status == KVAudioStreamerPlayStatusIdle) {
         return;
     }
+    [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusStop];
     //停止网络请求数据
     self.forPrepare = NO;
     self.currentSeekTime = 0;
@@ -235,14 +255,14 @@
 
 #pragma mark - 消费者代理事件
 - (KVAudioProviderReponse)wantAudioData {
-    return [self.currentAudioProvider getDataWithOffset:self.currentAudioProvider.currentFileLocation length:kAudioFileBufferSize];
+    return [self.currentAudioProvider getDataWithOffset:self.currentAudioProvider.currentFileLocation length:self.currentAudioFile.minRequestDataBytes];
 }
 
 - (void)prepareAlready {
     if (self.forPrepare && self.currentSeekTime) {
         //是需要准备的
-        self.forPrepare = NO;
         [self seekToTime:self.currentSeekTime];
+        self.forPrepare = NO;
     }
 }
 
@@ -258,7 +278,6 @@
 
 - (void)playStop {
     [self performSelectorOnMainThread:@selector(releaseTimer) withObject:nil waitUntilDone:YES];
-    [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusStop];
 }
 
 - (void)playFinish {
@@ -268,11 +287,13 @@
 
 - (void)playDone {
     [self performSelectorOnMainThread:@selector(releaseTimer) withObject:nil waitUntilDone:YES];
-    [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+    if (self.currentAudioFile.isNetwork && !self.currentAudioProvider.netDataReceiveComplete) {
+        [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusBuffering];
+    }
 }
 
 - (void)audioProviderDidFailWithErrorMsg:(NSString *)msg {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    kv_dispatch_main_async_safe(^{
         if ([self.delegate respondsToSelector:@selector(audioStreamer:didFailWithErrorType:msg:error:)]) {
             [self.delegate audioStreamer:self didFailWithErrorType:KVAudioStreamerErrorTypeDecode msg:msg error:nil];
         }
@@ -285,7 +306,7 @@
  @return 判断是否可以解析到数据
  */
 - (BOOL)parseLocalFileData {
-    return [self.currentAudioProvider getDataWithOffset:self.currentAudioProvider.currentFileLocation length:kAudioFileBufferSize];
+    return [self.currentAudioProvider getDataWithOffset:self.currentAudioProvider.currentFileLocation length:self.currentAudioFile.minRequestDataBytes];
 }
 
 #pragma mark - 其他
@@ -360,8 +381,10 @@
 - (void)playTimeChange {
     float time = [self.currentAudioConsumer getCurrentPlayTime];
     time = roundf(time);    //四舍五入
-    if (time > self.currentAudioFile.duration) {
-        time = self.currentAudioFile.duration;
+    if (self.currentAudioFile.duration > 0) {
+        if (time > self.currentAudioFile.duration) {
+            time = self.currentAudioFile.duration;
+        }
     }
     if ([self.delegate respondsToSelector:@selector(audioStreamer:playAtTime:)]) {
         [self.delegate audioStreamer:self playAtTime:self.currentSeekTime + time];
@@ -373,7 +396,10 @@
  通知播放状态改变
  */
 - (void)notifyDelegateForStatusChange:(KVAudioStreamerPlayStatus)status {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    if (self.status == status) {
+        return;
+    }
+    kv_dispatch_main_async_safe(^{
         self.status = status;
         if ([self.delegate respondsToSelector:@selector(audioStreamer: playStatusChange:)]) {
             [self.delegate audioStreamer:self playStatusChange:self.status];
@@ -384,17 +410,29 @@
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context {
     if ([keyPath isEqualToString:@"duration"]) {
         float duration = [change[@"new"] floatValue];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([self.delegate respondsToSelector:@selector(audioStreamer:durationChange:)]) {
-                [self.delegate audioStreamer:self durationChange:duration];
-            }
-        });
+        if (duration > 0) {
+            kv_dispatch_main_async_safe(^{
+                if ([self.delegate respondsToSelector:@selector(audioStreamer:durationChange:)]) {
+                    [self.delegate audioStreamer:self durationChange:duration];
+                }
+            });
+        }
+    }else if ([keyPath isEqualToString:@"estimateDuration"]) {
+        float estimateDuration = [change[@"new"] floatValue];
+        if (estimateDuration) {
+            kv_dispatch_main_async_safe(^{
+                if ([self.delegate respondsToSelector:@selector(audioStreamer:estimateDurationChange:)]) {
+                    [self.delegate audioStreamer:self estimateDurationChange:estimateDuration];
+                }
+            });
+        }
     }
 }
 
 - (void)dealloc {
     if (self.currentAudioFile) {
         [self.currentAudioFile removeObserver:self forKeyPath:@"duration"];
+        [self.currentAudioFile removeObserver:self forKeyPath:@"estimateDuration"];
     }
 }
 
