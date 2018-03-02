@@ -54,11 +54,8 @@ didReceiveResponse:(NSURLResponse *)response
  completionHandler:(void (^)(NSURLSessionResponseDisposition disposition))completionHandler {
     completionHandler(NSURLSessionResponseAllow);
     NSHTTPURLResponse * res = (NSHTTPURLResponse*)response;
-    if (res.statusCode == 200) {
-        //正确的
-        if ([self.delegate respondsToSelector:@selector(receiveHttpHeader:)]) {
-            [self.delegate receiveHttpHeader:res.allHeaderFields];
-        }
+    if ([self.delegate respondsToSelector:@selector(receiveHttpHeader:)]) {
+        [self.delegate receiveHttpHeader:res.allHeaderFields];
     }
 }
 
