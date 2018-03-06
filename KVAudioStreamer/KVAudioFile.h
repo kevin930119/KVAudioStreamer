@@ -31,6 +31,11 @@
 @property (nonatomic, assign) float duration;
 
 /**
+ 当前播放时长
+ */
+@property (nonatomic, assign) float currentPlayDuration;
+
+/**
  音频近似时长
  */
 @property (nonatomic, assign) float estimateDuration;

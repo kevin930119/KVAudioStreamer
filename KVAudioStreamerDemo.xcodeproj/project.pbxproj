@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A95AA0D204D42F300D97A3A /* chenyixun.png in Resources */ = {isa = PBXBuildFile; fileRef = 0A95AA0C204D42F200D97A3A /* chenyixun.png */; };
 		0AE45B42204646CC00DB7189 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B41204646CC00DB7189 /* AppDelegate.m */; };
 		0AE45B45204646CC00DB7189 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0AE45B44204646CC00DB7189 /* ViewController.m */; };
 		0AE45B48204646CC00DB7189 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0AE45B46204646CC00DB7189 /* Main.storyboard */; };
@@ -57,6 +58,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0A95AA0C204D42F200D97A3A /* chenyixun.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = chenyixun.png; sourceTree = "<group>"; };
 		0AE45B3D204646CC00DB7189 /* KVAudioStreamerDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KVAudioStreamerDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0AE45B40204646CC00DB7189 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		0AE45B41204646CC00DB7189 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -177,6 +179,7 @@
 				0AE45B41204646CC00DB7189 /* AppDelegate.m */,
 				0AE45B43204646CC00DB7189 /* ViewController.h */,
 				0AE45B44204646CC00DB7189 /* ViewController.m */,
+				0A95AA0C204D42F200D97A3A /* chenyixun.png */,
 				0AE45BFC2046B63600DB7189 /* 陈奕迅 - 稳稳的幸福.mp3 */,
 				0AE45BF720469D6B00DB7189 /* 陈奕迅 - 无人之境.mp3 */,
 				0AE45B89204647B000DB7189 /* KVAudioPlayerController.h */,
@@ -387,6 +390,7 @@
 				0AE45B4A204646CC00DB7189 /* Assets.xcassets in Resources */,
 				0AE45BF820469D6B00DB7189 /* 陈奕迅 - 无人之境.mp3 in Resources */,
 				0AE45B48204646CC00DB7189 /* Main.storyboard in Resources */,
+				0A95AA0D204D42F300D97A3A /* chenyixun.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

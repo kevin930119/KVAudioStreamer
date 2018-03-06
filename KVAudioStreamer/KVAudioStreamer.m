@@ -22,6 +22,7 @@
 @property (nonatomic, strong) NSTimer * playTimeObserveTimer;   //监听播放时长的定时器
 @property (nonatomic, assign) long currentSeekTime; //当前seek的位置，为了准确计算播放时长
 @property (atomic, assign) BOOL forPrepare;
+@property (nonatomic, assign) BOOL notifiedAlreadyPlay; //是否通知了开始播放
 
 @end
 
@@ -73,6 +74,7 @@
         self.currentAudioFile = nil;
         self.currentSeekTime = 0;
         self.forPrepare = NO;
+        self.notifiedAlreadyPlay = NO;
         self.currentAudioFile = file;
         [self.currentAudioFile addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:nil];
         [self.currentAudioFile addObserver:self forKeyPath:@"estimateDuration" options:NSKeyValueObservingOptionNew context:nil];
@@ -194,7 +196,9 @@
     if (self.status == KVAudioStreamerPlayStatusStop || self.status == KVAudioStreamerPlayStatusIdle) {
         return;
     }
-    [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusStop];
+    if (self.status != KVAudioStreamerPlayStatusFinish) {
+        [self notifyDelegateForStatusChange:KVAudioStreamerPlayStatusStop];
+    }
     //停止网络请求数据
     self.forPrepare = NO;
     self.currentSeekTime = 0;
@@ -386,8 +390,10 @@
             time = self.currentAudioFile.duration;
         }
     }
+    long playTime = self.currentSeekTime + time;
+    self.currentAudioFile.currentPlayDuration = (float)playTime;
     if ([self.delegate respondsToSelector:@selector(audioStreamer:playAtTime:)]) {
-        [self.delegate audioStreamer:self playAtTime:self.currentSeekTime + time];
+        [self.delegate audioStreamer:self playAtTime:playTime];
     }
 }
 

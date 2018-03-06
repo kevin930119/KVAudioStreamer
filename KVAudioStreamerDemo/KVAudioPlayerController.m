@@ -11,6 +11,7 @@
 #import "Masonry.h"
 #import <AVFoundation/AVFoundation.h>
 #import <MediaPlayer/MediaPlayer.h>
+#import "AppDelegate.h"
 
 @interface KVAudioPlayerController () <KVAudioStreamerDelegate>
 
@@ -22,6 +23,7 @@
 @property (nonatomic, strong) UISlider * slider;
 @property (nonatomic, strong) UISlider * volumeSlider;
 @property (nonatomic, assign) BOOL sliderDown;
+@property (nonatomic, assign) BOOL volumeSliderDown;
 
 @property (nonatomic, strong) NSDictionary * currentInfo;
 @property (nonatomic, strong) NSMutableArray * preArr;
@@ -61,6 +63,9 @@
     UISlider * volumeSlider = [UISlider new];
     volumeSlider.maximumValue = 1.0;
     [volumeSlider addTarget:self action:@selector(volumeChange:) forControlEvents:UIControlEventValueChanged];
+    [volumeSlider addTarget:self action:@selector(volumeTouchup) forControlEvents:UIControlEventTouchUpInside];
+    [volumeSlider addTarget:self action:@selector(volumeTouchup) forControlEvents:UIControlEventTouchUpOutside];
+    [volumeSlider addTarget:self action:@selector(volumeTouchdown) forControlEvents:UIControlEventTouchDown];
     [self.view addSubview:volumeSlider];
     [volumeSlider mas_makeConstraints:^(MASConstraintMaker *make) {
         make.height.mas_equalTo(30);
@@ -136,13 +141,14 @@
     
     self.streamer = [[KVAudioStreamer alloc] init];
     self.streamer.delegate = self;
-    self.streamer.cacheEnable = YES;
+    self.streamer.cacheEnable = YES;    //开启缓存功能
     //设置httpheader，音乐资源在阿里云OSS开启了防盗链，需要在这里设置referer，如果没有防盗链，那么不需要设置
     self.streamer.httpHeaders = @{@"Referer" : @"kevinrefer"};
     if (self.filepath) {
         [self.streamer resetAudioURL:self.filepath];
     }
-    //[self.streamer setVolumeSuperView:self.view];
+    //放开下面的注释，调整音频时不会出现系统音频提醒视图
+//    [self.streamer setVolumeSuperView:self.view];
     
     if (self.filepaths) {
         //播放列表设置
@@ -190,8 +196,20 @@
     volumeSlider.value = self.streamer.volume;
     //监听音量变化
     [[AVAudioSession sharedInstance] addObserver:self forKeyPath:@"outputVolume" options:NSKeyValueObservingOptionNew context:nil];
+    
+    //开启锁屏控制监听
+    [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
+    //设置锁屏控制通知
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(remotePlay) name:kNotifyRemoteControlPlay object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(remotePause) name:kNotifyRemoteControlPause object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(remotePre) name:kNotifyRemoteControlPrevious object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(remoteNext) name:kNotifyRemoteControlNext object:nil];
     AVAudioSession *session = [AVAudioSession sharedInstance];
     [session setActive:YES error:nil];
+    //设置成后台播放，还需要在项目设置Capabilities的Backgroud Modes里面勾选Audio,AirPlay...选项
+    [session setCategory:AVAudioSessionCategoryPlayback error:nil];
+    //不知道什么原因，如果不首先设置一下锁屏封面，第一次播放的时候，设置锁屏封面无效
+    [self pausePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:0 currentDuration:0];
 }
 
 - (void)touchdown:(UISlider*)slider {
@@ -203,6 +221,14 @@
     [self.streamer seekToTime:slider.value];
 }
 
+- (void)volumeTouchup {
+    self.volumeSliderDown = NO;
+}
+
+- (void)volumeTouchdown {
+    self.volumeSliderDown = YES;
+}
+
 - (void)volumeChange:(UISlider*)slider {
     self.streamer.volume = slider.value;
 }
@@ -211,18 +237,39 @@
     UIAlertController * ac = [UIAlertController alertControllerWithTitle:@"播放速率" message:@"修改播放速率" preferredStyle:UIAlertControllerStyleActionSheet];
     UIAlertAction * action = [UIAlertAction actionWithTitle:@"0.5" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         self.streamer.playRate = 0.5;
+        //需要更新一下锁屏封面
+        if (self.streamer.currentAudioFile.duration) {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.duration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }else {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.estimateDuration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }
     }];
     [ac addAction:action];
     UIAlertAction * action1 = [UIAlertAction actionWithTitle:@"1.0" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         self.streamer.playRate = 1.0;
+        if (self.streamer.currentAudioFile.duration) {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.duration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }else {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.estimateDuration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }
     }];
     [ac addAction:action1];
     UIAlertAction * action2 = [UIAlertAction actionWithTitle:@"1.5" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         self.streamer.playRate = 1.5;
+        if (self.streamer.currentAudioFile.duration) {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.duration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }else {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.estimateDuration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }
     }];
     [ac addAction:action2];
     UIAlertAction * action3 = [UIAlertAction actionWithTitle:@"2.0" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         self.streamer.playRate = 2.0;
+        if (self.streamer.currentAudioFile.duration) {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.duration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }else {
+            [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.estimateDuration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+        }
     }];
     [ac addAction:action3];
     UIAlertAction * action_cancle = [UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil];
@@ -234,9 +281,6 @@
     if (btn.selected) {
         [self.streamer pause];
     }else {
-        AVAudioSession *session = [AVAudioSession sharedInstance];
-        [session setCategory:AVAudioSessionCategoryPlayback error:nil];
-        [session setActive:YES error:nil];
         [self.streamer play];
 //        [self.streamer playAtTime:60];   //定点播放
     }
@@ -244,6 +288,7 @@
 
 - (void)stop {
     [self.streamer stop];
+    [self canclePlaybackInfo];
 }
 
 - (void)preBtnClick {
@@ -303,6 +348,11 @@
             NSLog(@"播放暂停");
             self.indiBackView.hidden = YES;
             self.playBtn.selected = NO;
+            if (self.streamer.currentAudioFile.duration) {
+                [self pausePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.duration currentDuration:self.streamer.currentAudioFile.currentPlayDuration];
+            }else {
+                [self pausePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.estimateDuration currentDuration:self.streamer.currentAudioFile.currentPlayDuration];
+            }
         }
             break;
         case KVAudioStreamerPlayStatusFinish:
@@ -318,6 +368,11 @@
             NSLog(@"播放中");
             self.indiBackView.hidden = YES;
             self.playBtn.selected = YES;
+            if (self.streamer.currentAudioFile.duration) {
+                [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.duration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+            }else {
+                [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:self.streamer.currentAudioFile.estimateDuration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+            }
         }
             break;
         case KVAudioStreamerPlayStatusIdle:
@@ -335,14 +390,18 @@
 - (void)audioStreamer:(KVAudioStreamer *)streamer durationChange:(float)duration {
     self.slider.enabled = YES;
     self.slider.maximumValue = duration;
-    NSLog(@"音频时长%f", duration);
+    if (self.streamer.status == KVAudioStreamerPlayStatusPlaying) {
+        [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:duration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
+    }
 }
 
 - (void)audioStreamer:(KVAudioStreamer *)streamer estimateDurationChange:(float)estimateDuration {
-    NSLog(@"音频近似时长%f", estimateDuration);
     self.slider.enabled = YES;
     if (!self.sliderDown) {
         self.slider.maximumValue = estimateDuration;
+    }
+    if (self.streamer.status == KVAudioStreamerPlayStatusPlaying) {
+        [self updatePlaybackInfoWithTitle:self.title arttist:@"未知歌手" image:[UIImage imageNamed:@"chenyixun"] duration:estimateDuration currentDuration:self.streamer.currentAudioFile.currentPlayDuration playRate:self.streamer.playRate];
     }
 }
 
@@ -362,12 +421,68 @@
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context {
-    if ([keyPath isEqualToString:@"outputVolume"]) {
+    if ([keyPath isEqualToString:@"outputVolume"] && !self.volumeSliderDown) {
         float outputVolume = [change[@"new"] floatValue];
         self.volumeSlider.value = outputVolume;
     }
 }
 
+#pragma mark - 设置锁屏界面
+- (void)updatePlaybackInfoWithTitle:(NSString*)title arttist:(NSString*)arttist image:(UIImage*)image duration:(float)duration currentDuration:(float)currentDuration playRate:(double)playRate {
+    MPNowPlayingInfoCenter * playingCenter = [MPNowPlayingInfoCenter defaultCenter];
+    NSMutableDictionary * playinginfo = [NSMutableDictionary dictionary];
+    playinginfo[MPMediaItemPropertyTitle] = title;
+    playinginfo[MPMediaItemPropertyArtist] = arttist;
+    MPMediaItemArtwork * artwork = [[MPMediaItemArtwork alloc] initWithImage:image];
+    playinginfo[MPMediaItemPropertyArtwork] = artwork;
+    playinginfo[MPMediaItemPropertyPlaybackDuration] = @(duration);
+    playinginfo[MPNowPlayingInfoPropertyPlaybackRate] = @(playRate);
+#ifdef __IPHONE_8_0
+    playinginfo[MPNowPlayingInfoPropertyDefaultPlaybackRate] = @1;
+#endif
+    playinginfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(currentDuration);
+    playingCenter.nowPlayingInfo = playinginfo;
+}
+
+- (void)pausePlaybackInfoWithTitle:(NSString*)title arttist:(NSString*)arttist image:(UIImage*)image duration:(float)duration currentDuration:(float)currentDuration {
+    MPNowPlayingInfoCenter * playingCenter = [MPNowPlayingInfoCenter defaultCenter];
+    NSMutableDictionary * playinginfo = [NSMutableDictionary dictionary];
+    playinginfo[MPMediaItemPropertyTitle] = title;
+    playinginfo[MPMediaItemPropertyArtist] = arttist;
+    MPMediaItemArtwork * artwork = [[MPMediaItemArtwork alloc] initWithImage:image];
+    playinginfo[MPMediaItemPropertyArtwork] = artwork;
+    playinginfo[MPMediaItemPropertyPlaybackDuration] = @(duration);
+    playinginfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(currentDuration);
+    playinginfo[MPNowPlayingInfoPropertyPlaybackRate] = @(0);
+#ifdef __IPHONE_8_0
+    playinginfo[MPNowPlayingInfoPropertyDefaultPlaybackRate] = @1;
+#endif
+    playingCenter.nowPlayingInfo = playinginfo;
+}
+
+- (void)canclePlaybackInfo {
+    MPNowPlayingInfoCenter * playingCenter = [MPNowPlayingInfoCenter defaultCenter];
+    playingCenter.nowPlayingInfo = nil;
+}
+
+#pragma mark - 锁屏控制
+- (void)remotePlay {
+    [self playBtn:self.playBtn];
+}
+
+- (void)remotePause {
+    [self playBtn:self.playBtn];
+}
+
+- (void)remotePre {
+    [self preBtnClick];
+}
+
+- (void)remoteNext {
+    [self nextBtnClick];
+}
+
+#pragma mark - getter
 - (NSMutableArray*)preArr {
     if (!_preArr) {
         _preArr = [NSMutableArray array];
@@ -384,7 +499,12 @@
 
 - (void)dealloc {
     [[AVAudioSession sharedInstance] removeObserver:self forKeyPath:@"outputVolume"];
+    //停止锁屏控制监听
+    [[UIApplication sharedApplication] endReceivingRemoteControlEvents];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self.streamer releaseStreamer];    //释放流媒体
+    self.streamer = nil;
+    [self canclePlaybackInfo];
 }
 
 @end

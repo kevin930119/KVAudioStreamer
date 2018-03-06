@@ -450,6 +450,9 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
 }
 
 - (void)singleAudioQueueBufferPlayComplete:(NSInteger)index {
+    if (self.isFinish) {
+        return;
+    }
     pthread_mutex_lock(&_mutex);
     _inuse[index] = NO;
     pthread_cond_signal(&_mutexCond);
@@ -491,14 +494,12 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         AudioQueueAddPropertyListener(_audioQueueRef, kAudioQueueProperty_IsRunning, KVAudioQueuePropertyListenerProc, (__bridge void*)self);
         UInt32 enableTimePitchConversion = 1;
         AudioQueueSetProperty (_audioQueueRef, kAudioQueueProperty_EnableTimePitch, &enableTimePitchConversion, sizeof(enableTimePitchConversion));
-        if (self.playRate != 1.0) {
-            AudioQueueSetParameter(_audioQueueRef, kAudioQueueParam_PlayRate, self.playRate);
-        }
+        AudioQueueSetParameter(_audioQueueRef, kAudioQueueParam_PlayRate, self.playRate);
         for (NSInteger i = 0; i < kNumberOfBuffers; i++) {
             //为每一个缓冲区分配空间
             AudioQueueAllocateBuffer(_audioQueueRef, self.file.singleBufferSize, &_audioqueuebufferref[i]);
         }
-        
+
         //增加cookie数据
         UInt32 cookieSize;
         Boolean writable;
@@ -522,6 +523,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         {
             return;
         }
+        
     }
 }
 

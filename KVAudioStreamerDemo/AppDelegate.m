@@ -25,6 +25,39 @@
     return YES;
 }
 
+#pragma mark - 锁屏控制通知
+- (void)remoteControlReceivedWithEvent:(UIEvent *)event {
+    switch (event.subtype) {
+        case UIEventSubtypeRemoteControlPlay:
+            //播放的
+        {
+            [[NSNotificationCenter defaultCenter] postNotificationName:kNotifyRemoteControlPlay object:nil];
+        }
+            break;
+        case UIEventSubtypeRemoteControlStop:
+            //停止
+        {
+        }
+            break;
+        case UIEventSubtypeRemoteControlPause:
+            //暂停
+        {
+            [[NSNotificationCenter defaultCenter] postNotificationName:kNotifyRemoteControlPause object:nil];
+        }
+            break;
+        case UIEventSubtypeRemoteControlNextTrack:
+            //下一首
+            [[NSNotificationCenter defaultCenter] postNotificationName:kNotifyRemoteControlNext object:nil];
+            break;
+        case UIEventSubtypeRemoteControlPreviousTrack:
+            //上一首
+            [[NSNotificationCenter defaultCenter] postNotificationName:kNotifyRemoteControlPrevious object:nil];
+            break;
+        default:
+            break;
+    }
+}
+
 
 - (void)applicationWillResignActive:(UIApplication *)application {
     // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
