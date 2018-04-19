@@ -457,10 +457,6 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     _inuse[index] = NO;
     pthread_cond_signal(&_mutexCond);
     pthread_mutex_unlock(&_mutex);
-    self.waitingForPlayInAudioQueueBufferCount--;
-    if (self.waitingForPlayInAudioQueueBufferCount < 0) {
-        self.waitingForPlayInAudioQueueBufferCount = 0;
-    }
     if (self.waitingForPlayInAudioQueueBufferCount == 0) {
         //播放完成了
         if (self.audioBufferFillComplete) {
@@ -482,6 +478,10 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
             AudioQueuePause(_audioQueueRef);
             pthread_mutex_unlock(&_audioQueueBufferingMutex);
         }
+    }
+    self.waitingForPlayInAudioQueueBufferCount--;
+    if (self.waitingForPlayInAudioQueueBufferCount < 0) {
+        self.waitingForPlayInAudioQueueBufferCount = 0;
     }
 }
 
