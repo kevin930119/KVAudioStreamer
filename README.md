@@ -60,7 +60,7 @@ self.streamer.playRate = 0.5;
 ```
 ***
 ## 4 代理通知
-KVAudioStreamer使用代理事件进行事件通知，总共有六个代理方法。
+KVAudioStreamer使用代理事件进行事件通知，总共有七个代理方法。
 ***
 - 播放状态改变通知，将会在这个代理方法里面接收到流媒体播放过程的各种状态变化。
 ```
@@ -88,6 +88,10 @@ KVAudioStreamerPlayStatusStop  //停止
 - 播放进度通知，内部使用定时器监听播放进度。
 ```
 - (void)audioStreamer:(KVAudioStreamer *)streamer playAtTime:(long)location;
+```
+- 网络缓存进度通知，仅对网络下载进度进行回调通知，进度条的显示需要开发者自行实现，根据文件大小可计算出比值
+```
+- (void)audioStreamer:(KVAudioStreamer *)streamer loadNetworkDataInRange:(NSRange)range fileSize:(UInt64)filesize;
 ```
 - 缓存完成通知，如果开启了缓存功能，并且文件完整缓存成功，将会回调这个方法，返回YES，将会删除该缓存文件。
 ```
