@@ -251,6 +251,16 @@
     return flag;
 }
 
+- (void)audioProviderReceiveDataProgressWithStart:(UInt64)start length:(UInt64)length {
+    if (!self.forPrepare) {
+        kv_dispatch_main_async_safe(^{
+            if ([self.delegate respondsToSelector:@selector(audioStreamer:loadNetworkDataInRange:fileSize:)]) {
+                [self.delegate audioStreamer:self loadNetworkDataInRange:NSMakeRange(start, length) fileSize:self.currentAudioFile.filesize];
+            }
+        });
+    }
+}
+
 - (void)audioProviderDidFailWithErrorType:(KVAudioStreamerErrorType)errorType msg:(NSString *)msg error:(NSError *)error {
     if ([self.delegate respondsToSelector:@selector(audioStreamer:didFailWithErrorType:msg:error:)]) {
         [self.delegate audioStreamer:self didFailWithErrorType:errorType msg:msg error:error];

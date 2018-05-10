@@ -53,6 +53,15 @@
 - (void)audioStreamer:(KVAudioStreamer *)streamer playAtTime:(long)location;
 
 /**
+ 网络请求数据加载区间
+
+ @param streamer 流媒体
+ @param range 数据区间，如果是没有seek操作的，那么是从0开始的，如果使用了seek操作，那么会从seek的文件位置开始，如果开发者需要在进度条中显示加载进度，需要自行处理（可以通过原文件大小跟数据区间的length比值来显示进度）
+ @param filesize 原文件大小
+ */
+- (void)audioStreamer:(KVAudioStreamer *)streamer loadNetworkDataInRange:(NSRange)range fileSize:(UInt64)filesize;
+
+/**
  文件缓存完成通知，流媒体内部不会处理网络路径与本地路径的映射关系，需要开发者自行处理，例如，第一次播放网络音频，在收到缓存完成后，将缓存文件的路径信息（文件夹，文件名都需要保存，方便下次做路径拼接）保存，下次如果继续播放该网络音频，先获取本地路径，通过本地路径进行音频播放
  说明：当网络文件缓存从头到尾完全加载后，继续seek操作将不会再做网络请求了，如果还未完全加载完毕就使用seek操作，那么将会重新启动网络请求，该文件再不会被判定为完全加载，因为保存起来的文件流数据已经不能当做一个完整文件看待。
 

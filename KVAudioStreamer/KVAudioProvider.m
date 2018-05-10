@@ -162,6 +162,9 @@
     }else {
         self.netData = [NSMutableData dataWithData:data];
     }
+    if ([self.delegate respondsToSelector:@selector(audioProviderReceiveDataProgressWithStart:length:)]) {
+        [self.delegate audioProviderReceiveDataProgressWithStart:self.netDataRequestStart length:self.netData.length];
+    }
     if (self.waitingForNetData) {
         if (self.file.filesize > self.file.minRequestDataBytes) {
             //当音频文件大于最小数据单位时

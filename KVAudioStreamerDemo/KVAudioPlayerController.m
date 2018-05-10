@@ -411,6 +411,10 @@
     }
 }
 
+- (void)audioStreamer:(KVAudioStreamer *)streamer loadNetworkDataInRange:(NSRange)range fileSize:(UInt64)filesize {
+    NSLog(@"加载数据%@ 文件大小%lld", NSStringFromRange(range), filesize);
+}
+
 - (BOOL)audioStreamer:(KVAudioStreamer *)streamer cacheCompleteWithRelativePath:(NSString *)relativePath cachepath:(NSString *)cachepath {
     NSLog(@"缓存文件成功%@", relativePath);
     return YES;

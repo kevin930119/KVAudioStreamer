@@ -18,6 +18,8 @@
  */
 - (void)audioProviderReceiveData:(NSData*)data;
 
+- (void)audioProviderReceiveDataProgressWithStart:(UInt64)start length:(UInt64)length;
+
 - (BOOL)audioProviderFileCacheFinishWithDir:(NSString*)dir filename:(NSString*)filename cachepath:(NSString*)cachepath;
 
 /**
