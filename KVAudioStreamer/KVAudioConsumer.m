@@ -457,7 +457,7 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     _inuse[index] = NO;
     pthread_cond_signal(&_mutexCond);
     pthread_mutex_unlock(&_mutex);
-    if (self.waitingForPlayInAudioQueueBufferCount == 0) {
+    if (self.waitingForPlayInAudioQueueBufferCount <= 1) {
         //播放完成了
         if (self.audioBufferFillComplete) {
             //数据全加载完成
