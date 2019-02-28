@@ -149,17 +149,17 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
         if (!self.forPrepare && !self.isFinish) {
             //继续获取数据解析
             if (![self fillBufferComplete]) {
-                //已经是音频文件的最后一段数据了，直接入队
-                self.audioBufferFillComplete = YES; //数据填充完成标识
                 if (self.audioDataBytesFilled) {
-                    BOOL flag = [self getInAudioQueue]; //加入播放队列
+                    // 存在未入队的数据
+                    BOOL flag = [self getInAudioQueue];
                     if (!flag) {
-                        //报错
                         if ([self.delegate respondsToSelector:@selector(audioProviderDidFailWithErrorMsg:)]) {
                             [self.delegate audioProviderDidFailWithErrorMsg:@"音频数据入队失败"];
                         }
                     }
                 }
+                
+                self.audioBufferFillComplete = YES; //数据填充完成标识
             }
         }
     }
@@ -453,21 +453,21 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
     if (self.isFinish) {
         return;
     }
+    
+    self.waitingForPlayInAudioQueueBufferCount--;
+    if (self.waitingForPlayInAudioQueueBufferCount < 0) {
+        self.waitingForPlayInAudioQueueBufferCount = 0;
+    }
     pthread_mutex_lock(&_mutex);
     _inuse[index] = NO;
     pthread_cond_signal(&_mutexCond);
     pthread_mutex_unlock(&_mutex);
-    if (self.waitingForPlayInAudioQueueBufferCount <= 1) {
+    
+    if (self.waitingForPlayInAudioQueueBufferCount <= 0) {
         //播放完成了
         if (self.audioBufferFillComplete) {
-            //数据全加载完成
-            if ([self.delegate respondsToSelector:@selector(playFinish)] && !self.isFinish) {
-                [self.delegate playFinish];
-            }
-            //播放完成，清除资源
-            [self resetAudioQueue];
-            self.isPause = NO;
-            [self closeFileStream];
+            // 延迟执行，为了解决某些音频在还未播放完成时系统提前调用了该方法
+            [self performSelector:@selector(notifyAudioPlayFinish) withObject:nil afterDelay:2.0];
         }else {
             self.waitingForBuffer = YES;
             pthread_mutex_lock(&_audioQueueBufferingMutex);
@@ -479,10 +479,17 @@ void KVAudioQueuePropertyListenerProc (void * __nullable inUserData, AudioQueueR
             pthread_mutex_unlock(&_audioQueueBufferingMutex);
         }
     }
-    self.waitingForPlayInAudioQueueBufferCount--;
-    if (self.waitingForPlayInAudioQueueBufferCount < 0) {
-        self.waitingForPlayInAudioQueueBufferCount = 0;
+}
+
+- (void)notifyAudioPlayFinish {
+    //数据全加载完成
+    if ([self.delegate respondsToSelector:@selector(playFinish)] && !self.isFinish) {
+        [self.delegate playFinish];
     }
+    //播放完成，清除资源
+    [self resetAudioQueue];
+    self.isPause = NO;
+    [self closeFileStream];
 }
 
 - (void)createQueue {

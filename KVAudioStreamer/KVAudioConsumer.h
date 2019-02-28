@@ -11,6 +11,8 @@
 
 @protocol KVAudioConsumerDelegate <NSObject>
 
+- (float)playLocation;
+
 - (KVAudioProviderReponse)wantAudioData;
 
 - (void)prepareAlready;

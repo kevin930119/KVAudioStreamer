@@ -24,6 +24,8 @@
 @property (atomic, assign) BOOL forPrepare;
 @property (nonatomic, assign) BOOL notifiedAlreadyPlay; //是否通知了开始播放
 
+@property (nonatomic, assign) long currentPlayLocation;
+
 @end
 
 @implementation KVAudioStreamer
@@ -268,6 +270,10 @@
 }
 
 #pragma mark - 消费者代理事件
+- (float)playLocation {
+    return (float)self.currentPlayLocation;
+}
+
 - (KVAudioProviderReponse)wantAudioData {
     return [self.currentAudioProvider getDataWithOffset:self.currentAudioProvider.currentFileLocation length:self.currentAudioFile.minRequestDataBytes];
 }
@@ -405,6 +411,7 @@
     if ([self.delegate respondsToSelector:@selector(audioStreamer:playAtTime:)]) {
         [self.delegate audioStreamer:self playAtTime:playTime];
     }
+    self.currentPlayLocation = playTime;
 }
 
 #pragma mark - 通知代理事件
